@@ -1,0 +1,21 @@
+QMainWindow {
+    background-color:rgba(124, 169, 156, 0.36);
+    border-radius: 9999px
+}
+
+QPushButton {
+    background-color:rgba(44, 55, 149, 0.36);
+    color:rgb(29, 43, 55);
+    padding: 5px;
+    min-width: 100px; 
+    max-width: 500px;
+    min-height: 200px; 
+    border-radius: 10px;
+    font-size: 64px;
+    font-weight: bold;
+    font-family: "Helvetica", sans-serif;
+}
+
+QPushButton:hover {
+    background-color: #005a9e;
+}
