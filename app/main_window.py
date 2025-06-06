@@ -2,7 +2,7 @@
 
 from PySide6.QtWidgets import QMainWindow, QGraphicsDropShadowEffect
 from PySide6.QtGui import QColor
-from .ui_main import Ui_MainWindow
+from app.ui_main import Ui_MainWindow
 
 class MainWindow(QMainWindow):
     def __init__(self):
