@@ -31,8 +31,8 @@ def on_leave(data):
 
 def start_server(port):
     print(f"Launching SocketIO server on port {port}")
-    socketio.run(app, host='127.0.0.1', port=port)
+    socketio.run(app, host='0.0.0.0', port=port)
 
 def end_server(port):
     print(f"Stopping SocketIO server on port {port}")
-    socketio.stop(app, host='127.0.0.1', port=port)
+    socketio.stop(app, host='0.0.0.0', port=port)

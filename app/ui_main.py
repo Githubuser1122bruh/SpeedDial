@@ -13,6 +13,8 @@ import socketio
 base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 style_path = os.path.join(base_dir, "assets", "logo.png")
 
+host_ip = "192.168.1.11"
+
 key = Fernet.generate_key()
 f = Fernet(key)
 
@@ -222,7 +224,7 @@ class joinmeetingdialog():
                     self.sio = socketio.Client()
 
                     try:
-                        self.sio.connect(f"http://127.0.0.1:{port}")
+                        self.sio.connect(f"http://{host_ip}:{port}")
                         print("Connected user to port")
                         self.sio.emit("join", {
                             "room": self.requestedid,
