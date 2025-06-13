@@ -14,8 +14,6 @@ build/
 *.qmlc
 *.qrc.py
 
-app/ui_main.py
-
 env/
 venv/
 ENV/
