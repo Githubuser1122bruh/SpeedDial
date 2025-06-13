@@ -1,15 +1,16 @@
-# Running this effectively runs everything
+ # Running this effectively runs everything
 
 import os
 import sys
 from PySide6.QtWidgets import QApplication
+import threading
 from app.main_window import MainWindow
+import app.serverside
 
 def main():
     app = QApplication(sys.argv)
 
     base_dir = os.path.abspath(os.path.dirname(__file__))
-    print(base_dir)
     style_path = os.path.join(base_dir, "app", "resources", "style.qss")
     with open(style_path, "r") as file:
         app.setStyleSheet(file.read())

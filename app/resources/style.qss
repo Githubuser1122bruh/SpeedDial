@@ -1,11 +1,13 @@
 QMainWindow {
-    background-color:rgba(124, 169, 156, 0.36);
-    border-radius: 9999px
+    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                    stop: 0 rgb(60, 21, 52),
+                                    stop: 1 rgb(13, 13, 13));
+    border-radius: 9999px;
 }
 
 QPushButton {
-    background-color:rgba(44, 55, 149, 0.36);
-    color:rgb(29, 43, 55);
+    background-color: rgba(44, 55, 149, 0.36);
+    color: rgb(29, 43, 55);
     padding: 0px;
     min-width: 100px; 
     max-width: 500px;
@@ -26,6 +28,17 @@ QPushButton:hover {
     border-radius: 65px;
     padding: 10px;
     max-width: 150px;
-    max-height: 150px;
-    
+    max-height: 150px;   
+}
+
+.confirmbutton {
+    max-width: 400px;
+    max-height: 100px;
+    padding: 10px;
+    border-radius: 15px;
+    background-color: rgb(117, 109, 109);
+}
+
+QLabel {
+    padding: 15px;
 }
