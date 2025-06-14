@@ -105,8 +105,6 @@ class meeting():
         conn.commit()
         conn.close()
 
-        threading.Thread(target=serverside.start_server, args=(port,), daemon=True).start()
-
         self.centralwidget = QWidget(MainWindow)
         MainWindow.setCentralWidget(self.centralwidget)
         self.main_layout = QVBoxLayout(self.centralwidget)
@@ -142,6 +140,14 @@ class meeting():
         self.button_h_layout.addStretch(1)
         self.main_layout.addLayout(self.button_h_layout)
 
+        self.shutdown_event = threading.Event()
+        self.server_thread = threading.Thread(target=serverside.start_server, args=(port, self.shutdown_event), daemon=True)
+        self.server_thread.start()
+
+        self.MainWindow = MainWindow
+
+        self.MainWindow.closeEvent = self.on_close
+
     def generate_unique_meeting(self, cursor):
         while True:
             meeting_id = str(random.randint(100000, 999999))
@@ -149,6 +155,11 @@ class meeting():
             cursor.execute("SELECT * FROM meetings WHERE meeting_id = ?", (encrypt_data(meeting_id),))
             if cursor.fetchone() is None:
                 return meeting_id, passcode
+            
+    def on_close(self, event):
+        self.shutdown_event.set()
+        self.server_thread.join()
+        event.accept()
 
 def encrypt_data(data):
     return key.encrypt(str(data).encode()).decode()
@@ -193,18 +204,20 @@ class joinmeetingdialog():
         self.confirmbutton.setProperty("class", "confirmbutton")
 
     def onclickconfirm(self, status):
-        conn = sqlite3.connect("meetings.db")
+        db_path = os.path.join(base_dir, "meetings.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT meeting_id, passcode FROM meetings")
         rows = cursor.fetchall()
-        self.requestedid = self.inputidbox.text()
-        self.requestedpasscode = self.inputpasswordbox.text()
+        self.requestedid = self.inputidbox.text().strip()
+        self.requestedpasscode = self.inputpasswordbox.text().strip()
         conn.close()
         print(f"ID: {self.requestedid} Passcode: {self.requestedpasscode}")
         for encrypted_id, encrypted_pass in rows:
-            decrypted_id = decrypt_data(encrypted_id)
-            decrypted_pass = decrypt_data(encrypted_pass)
+            decrypted_id = decrypt_data(encrypted_id).strip()
+            decrypted_pass = decrypt_data(encrypted_pass).strip()
             if self.requestedid == decrypted_id and self.requestedpasscode == decrypted_pass:
+                print("Match found! Connecting to meeting...")
                 self.connect_meeting(confirmornot=True)
                 return
 
@@ -212,20 +225,20 @@ class joinmeetingdialog():
 
     def connect_meeting(self, confirmornot):
         if confirmornot:
-            conn = sqlite3.connect("meetings.db")
+            db_path = os.path.join(base_dir, "meetings.db")
+            conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
-            cursor.execute("SELECT passcode, port FROM meetings WHERE meeting_id = ?", (self.requestedid,))
+            encrypted_id = encrypt_data(self.requestedid)
+            cursor.execute("SELECT passcode, port FROM meetings WHERE meeting_id = ?", (encrypted_id,))
             row = cursor.fetchone()
             conn.close()
 
             if row:
                 stored_passcode_encrypted, port = row
-                stored_passcode = decrypt_data(stored_passcode_encrypted)
+                stored_passcode = decrypt_data(stored_passcode_encrypted).strip()
 
-                if stored_passcode == self.requestedpasscode: 
+                if stored_passcode == self.requestedpasscode:
                     self.sio = socketio.Client()
-                    host_ip = "192.168.1.11" 
-
                     try:
                         self.sio.connect(f"http://{host_ip}:{port}")
                         print("Connected user to port")
@@ -236,3 +249,7 @@ class joinmeetingdialog():
                     except Exception as e:
                         print("Connection failed:", e)
                         self.confirmedornotlabel.setText("Failed to connect")
+                else:
+                    self.confirmedornotlabel.setText("Incorrect passcode")
+            else:
+                self.confirmedornotlabel.setText("Meeting not found")

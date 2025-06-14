@@ -1,5 +1,7 @@
 from flask import Flask
 from flask_socketio import SocketIO, emit, join_room, leave_room
+import threading
+import time
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
@@ -29,9 +31,19 @@ def on_leave(data):
     print(f"Peer {peer_id} left room {room}")
     emit('peer_left', {'peer_id': peer_id}, room=room)
 
-def start_server(port):
+def start_server(port, shutdown_event):
     print(f"Launching SocketIO server on port {port}")
-    socketio.run(app, host='0.0.0.0', port=port)
+
+    def run_socketio():
+        socketio.run(app, host='0.0.0.0', port=port)
+
+    server_thread = threading.Thread(target=run_socketio)
+    server_thread.start()
+
+    while not shutdown_event.is_set():
+        time.sleep(0.5) 
+  
+    print("Server shutdown signal received")
 
 def end_server(port):
     print(f"Stopping SocketIO server on port {port}")
