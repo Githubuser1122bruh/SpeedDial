@@ -150,6 +150,7 @@ class meeting():
             if cursor.fetchone() is None:
                 return meeting_id, passcode
 
+
 def encrypt_data(data):
     return key.encrypt(str(data).encode()).decode()
 
