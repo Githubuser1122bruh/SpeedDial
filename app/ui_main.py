@@ -82,8 +82,8 @@ class meeting():
         screen = QGuiApplication.primaryScreen().geometry()
         MainWindow.resize(screen.width() - 50, screen.height() - 100)
 
-
-        conn = sqlite3.connect("meetings.db")
+        db_path = os.path.join(base_dir, "meetings.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS meetings (
@@ -149,7 +149,6 @@ class meeting():
             cursor.execute("SELECT * FROM meetings WHERE meeting_id = ?", (encrypt_data(meeting_id),))
             if cursor.fetchone() is None:
                 return meeting_id, passcode
-
 
 def encrypt_data(data):
     return key.encrypt(str(data).encode()).decode()
