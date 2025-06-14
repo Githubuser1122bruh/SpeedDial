@@ -1,21 +1,37 @@
 import os
+import firebase_admin
+from firebase_admin import credentials, firestore
 from PySide6.QtWidgets import QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QLineEdit
 from PySide6.QtGui import QGuiApplication, QImage, QPixmap
 from PySide6.QtCore import Qt 
 import random
 import sqlite3
-from cryptography.fernet import Fernet
 import socket
 import threading
-from app import serverside
 import socketio
+from app import serverside
+from app.fernetkeygen import key
 
 base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 style_path = os.path.join(base_dir, "assets", "logo.png")
 
-host_ip = "192.168.1.11"
+cred = credentials.Certificate(os.path.join(base_dir, "app/speeddial-f2572-firebase-adminsdk-fbsvc-19fdde59c7.json"))
+firebase_admin.initialize_app(cred)
+db = firestore.client()
 
-from app.fernetkeygen import key
+def get_local_ip():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        print("IP found")
+        return ip
+    except Exception:
+        print("IP couldnt be found, reverting to fallback IP")
+        return "127.0.0.1"
+
+host_ip = get_local_ip() # changed to the users local ip
 
 def get_free_port():
     s = socket.socket()
@@ -23,6 +39,12 @@ def get_free_port():
     port = s.getsockname()[1]
     s.close()
     return port
+
+def encrypt_data(data):
+    return key.encrypt(str(data).encode()).decode()
+
+def decrypt_data(data):
+    return key.decrypt(data.encode()).decode()
 
 class Ui_MainWindow:
     def setupUi(self, MainWindow):
@@ -53,7 +75,10 @@ class Ui_MainWindow:
         self.main_layout.addLayout(self.top_bar_layout)
 
         image = QImage(style_path)
-        self.logo_label.setPixmap(QPixmap.fromImage(image).scaled(150, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation)) if not image.isNull() else self.logo_label.setText("Failed to load image")
+        if not image.isNull():
+            self.logo_label.setPixmap(QPixmap.fromImage(image).scaled(150, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        else:
+            self.logo_label.setText("Failed to load image")
 
         self.button = QPushButton("New Meeting")
         self.joinbutton = QPushButton("Join Meeting")
@@ -82,28 +107,15 @@ class meeting():
         screen = QGuiApplication.primaryScreen().geometry()
         MainWindow.resize(screen.width() - 50, screen.height() - 100)
 
-        db_path = os.path.join(base_dir, "meetings.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS meetings (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                meeting_id TEXT UNIQUE,
-                passcode TEXT,
-                port INTEGER
-            )
-        """)
-        conn.commit()
-
-        meeting_id, passcode = self.generate_unique_meeting(cursor)
+        meeting_id, passcode = self.generate_unique_meeting()
         encrypted_id = encrypt_data(meeting_id)
         encrypted_passcode = encrypt_data(passcode)
-
         port = get_free_port()
-        cursor.execute("INSERT INTO meetings (meeting_id, passcode, port) VALUES (?, ?, ?)",
-                            (encrypted_id, encrypted_passcode, port))
-        conn.commit()
-        conn.close()
+        db.collection("meetings").add({
+            "meeting_id": encrypted_id,
+            "passcode": encrypted_passcode,
+            "port": port
+        })
 
         self.centralwidget = QWidget(MainWindow)
         MainWindow.setCentralWidget(self.centralwidget)
@@ -118,7 +130,10 @@ class meeting():
         self.logo_label.setFixedSize(30, 30)
         self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         image = QImage(style_path)
-        self.logo_label.setPixmap(QPixmap.fromImage(image).scaled(50, 50, Qt.KeepAspectRatio, Qt.SmoothTransformation)) if not image.isNull() else self.logo_label.setText("Logo")
+        if not image.isNull():
+            self.logo_label.setPixmap(QPixmap.fromImage(image).scaled(50, 50, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        else:
+            self.logo_label.setText("Logo")
         self.top_bar_layout.addWidget(self.logo_label)
 
         self.id_label = QLabel(f"Meeting ID: {meeting_id}")
@@ -140,32 +155,27 @@ class meeting():
         self.button_h_layout.addStretch(1)
         self.main_layout.addLayout(self.button_h_layout)
 
+        # Start server thread and handle shutdown event
         self.shutdown_event = threading.Event()
         self.server_thread = threading.Thread(target=serverside.start_server, args=(port, self.shutdown_event), daemon=True)
         self.server_thread.start()
 
         self.MainWindow = MainWindow
-
         self.MainWindow.closeEvent = self.on_close
 
-    def generate_unique_meeting(self, cursor):
+    def generate_unique_meeting(self):
         while True:
             meeting_id = str(random.randint(100000, 999999))
             passcode = str(random.randint(1000, 9999))
-            cursor.execute("SELECT * FROM meetings WHERE meeting_id = ?", (encrypt_data(meeting_id),))
-            if cursor.fetchone() is None:
+            encrypted_id = encrypt_data(meeting_id)
+            docs = db.collection("meetings").where("meeting_id", "==", encrypted_id).stream()
+            if not any(docs):
                 return meeting_id, passcode
-            
+
     def on_close(self, event):
         self.shutdown_event.set()
         self.server_thread.join()
         event.accept()
-
-def encrypt_data(data):
-    return key.encrypt(str(data).encode()).decode()
-
-def decrypt_data(data):
-    return key.decrypt(data.encode()).decode()
 
 class joinmeetingdialog():
     def dialogue(self, MainWindow):
@@ -203,42 +213,38 @@ class joinmeetingdialog():
         self.confirmbutton.clicked.connect(self.onclickconfirm)
         self.confirmbutton.setProperty("class", "confirmbutton")
 
-    def onclickconfirm(self, status):
-        db_path = os.path.join(base_dir, "meetings.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT meeting_id, passcode FROM meetings")
-        rows = cursor.fetchall()
+    def onclickconfirm(self, status=None):
+        docs = db.collection("meetings").stream()
+        rows = [(doc.to_dict()["meeting_id"], doc.to_dict()["passcode"]) for doc in docs]
         self.requestedid = self.inputidbox.text().strip()
         self.requestedpasscode = self.inputpasswordbox.text().strip()
-        conn.close()
         print(f"ID: {self.requestedid} Passcode: {self.requestedpasscode}")
         for encrypted_id, encrypted_pass in rows:
-            decrypted_id = decrypt_data(encrypted_id).strip()
-            decrypted_pass = decrypt_data(encrypted_pass).strip()
-            if self.requestedid == decrypted_id and self.requestedpasscode == decrypted_pass:
-                print("Match found! Connecting to meeting...")
-                self.connect_meeting(confirmornot=True)
-                return
+            try:
+                decrypted_id = decrypt_data(encrypted_id).strip()
+                decrypted_pass = decrypt_data(encrypted_pass).strip()
+                if self.requestedid == decrypted_id and self.requestedpasscode == decrypted_pass:
+                    print("Match found! Connecting to meeting...")
+                    self.connect_meeting(confirmornot=True)
+                    return
+            except Exception as e:
+                print(f"Decryption error: {e}")
 
         self.confirmedornotlabel.setText("Invalid meeting ID or passcode")
 
     def connect_meeting(self, confirmornot):
         if confirmornot:
-            db_path = os.path.join(base_dir, "meetings.db")
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
             encrypted_id = encrypt_data(self.requestedid)
-            cursor.execute("SELECT passcode, port FROM meetings WHERE meeting_id = ?", (encrypted_id,))
-            row = cursor.fetchone()
-            conn.close()
-
+            docs = db.collection("meetings").where("meeting_id", "==", encrypted_id).stream()
+            row = next(docs, None)
             if row:
-                stored_passcode_encrypted, port = row
+                data = row.to_dict()
+                stored_passcode_encrypted = data["passcode"]
+                port = data["port"]
                 stored_passcode = decrypt_data(stored_passcode_encrypted).strip()
 
                 if stored_passcode == self.requestedpasscode:
-                    self.sio = socketio.Client(logger=True, engineio_logger=True)  # Enable client-side debug
+                    self.sio = socketio.Client(logger=True, engineio_logger=True)
 
                     @self.sio.event
                     def connect():
