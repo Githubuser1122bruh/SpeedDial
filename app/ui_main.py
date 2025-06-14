@@ -15,8 +15,7 @@ style_path = os.path.join(base_dir, "assets", "logo.png")
 
 host_ip = "192.168.1.11"
 
-key = Fernet.generate_key()
-f = Fernet(key)
+from app.fernetkeygen import key
 
 def get_free_port():
     s = socket.socket()
@@ -152,10 +151,10 @@ class meeting():
                 return meeting_id, passcode
 
 def encrypt_data(data):
-    return f.encrypt(str(data).encode()).decode()
+    return key.encrypt(str(data).encode()).decode()
 
-def decrypt_data(encrypted_data):
-    return f.decrypt(encrypted_data.encode()).decode()
+def decrypt_data(data):
+    return key.decrypt(data.encode()).decode()
 
 class joinmeetingdialog():
     def dialogue(self, MainWindow):
@@ -198,17 +197,18 @@ class joinmeetingdialog():
         cursor = conn.cursor()
         cursor.execute("SELECT meeting_id, passcode FROM meetings")
         rows = cursor.fetchall()
-        self.id_from_meetingsdb = {i: row[0] for i, row in enumerate(rows)}
-        self.passcode_from_meetingsdb = {i: row[1] for i, row in enumerate(rows)}
         self.requestedid = self.inputidbox.text()
         self.requestedpasscode = self.inputpasswordbox.text()
         conn.close()
-        print(self.id_from_meetingsdb)
         print(f"ID: {self.requestedid} Passcode: {self.requestedpasscode}")
-        if self.requestedid in self.id_from_meetingsdb.values() and self.requestedpasscode in self.passcode_from_meetingsdb.values():
-            self.connect_meeting(confirmornot=True)
-        else:
-            self.confirmedornotlabel.setText("Invalid meeting ID or passcode")
+        for encrypted_id, encrypted_pass in rows:
+            decrypted_id = decrypt_data(encrypted_id)
+            decrypted_pass = decrypt_data(encrypted_pass)
+            if self.requestedid == decrypted_id and self.requestedpasscode == decrypted_pass:
+                self.connect_meeting(confirmornot=True)
+                return
+
+        self.confirmedornotlabel.setText("Invalid meeting ID or passcode")
 
     def connect_meeting(self, confirmornot):
         if confirmornot:
@@ -217,11 +217,14 @@ class joinmeetingdialog():
             cursor.execute("SELECT passcode, port FROM meetings WHERE meeting_id = ?", (self.requestedid,))
             row = cursor.fetchone()
             conn.close()
+
             if row:
                 stored_passcode_encrypted, port = row
                 stored_passcode = decrypt_data(stored_passcode_encrypted)
+
                 if stored_passcode == self.requestedpasscode: 
                     self.sio = socketio.Client()
+                    host_ip = "192.168.1.11" 
 
                     try:
                         self.sio.connect(f"http://{host_ip}:{port}")
@@ -233,4 +236,3 @@ class joinmeetingdialog():
                     except Exception as e:
                         print("Connection failed:", e)
                         self.confirmedornotlabel.setText("Failed to connect")
-                        print("Connection failed")
