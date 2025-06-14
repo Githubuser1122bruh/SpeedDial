@@ -238,16 +238,30 @@ class joinmeetingdialog():
                 stored_passcode = decrypt_data(stored_passcode_encrypted).strip()
 
                 if stored_passcode == self.requestedpasscode:
-                    self.sio = socketio.Client()
+                    self.sio = socketio.Client(logger=True, engineio_logger=True)  # Enable client-side debug
+
+                    @self.sio.event
+                    def connect():
+                        print("[Client] Connected to server")
+
+                    @self.sio.event
+                    def connect_error(data):
+                        print(f"[Client] Connection failed: {data}")
+
+                    @self.sio.event
+                    def disconnect():
+                        print("[Client] Disconnected from server")
+
                     try:
+                        print(f"[Client] Trying to connect to http://{host_ip}:{port}")
                         self.sio.connect(f"http://{host_ip}:{port}")
-                        print("Connected user to port")
+                        print("[Client] Connected, emitting join event")
                         self.sio.emit("join", {
                             "room": self.requestedid,
                             "peer_id": "client_" + self.requestedid
                         })
                     except Exception as e:
-                        print("Connection failed:", e)
+                        print(f"[Client] Exception during connection or emit: {e}")
                         self.confirmedornotlabel.setText("Failed to connect")
                 else:
                     self.confirmedornotlabel.setText("Incorrect passcode")
