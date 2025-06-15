@@ -1,7 +1,7 @@
 import os
 import firebase_admin
 from firebase_admin import credentials, firestore
-from PySide6.QtWidgets import QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QLineEdit
+from PySide6.QtWidgets import QMainWindow, QPushButton, QDialog, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QLineEdit
 from PySide6.QtGui import QGuiApplication, QImage, QPixmap
 from PySide6.QtCore import Qt 
 import random
@@ -11,6 +11,7 @@ import threading
 import socketio
 from app import serverside
 from app.fernetkeygen import key
+from RESTauth import sign_in
 
 base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 style_path = os.path.join(base_dir, "assets", "logo.png")
@@ -45,6 +46,39 @@ def encrypt_data(data):
 
 def decrypt_data(data):
     return key.decrypt(data.encode()).decode()
+
+class loginDialog(QDialog):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Login")
+        self.resize(300, 150)
+
+        layout = QVBoxLayout()
+
+        self.email_input = QLineEdit()
+        self.email_input.setPlaceHolderText("samhith.pola@gmail.com (enter email)")
+        layout.addWidget(self.email_input)
+        
+        self.password_input = QLineEdit()
+        self.password_input.setPlaceHolderText("Enter Password")
+        self.password_input.setEchoMode(QLineEdit.Password)
+        layout.addWidget(self.password_input)
+        
+        self.setLayout(layout)
+
+        self.token = None
+
+        def attempt_login(self):
+            email = self.email_input.text()
+            password = self.password_input.text()
+
+            credentials = sign_in(email, password)
+            if credentials:
+                self.token = credentials["idToken"]
+                self.status_label.setText("Login successful")
+                self.accept()
+            else:
+                self.status_label.setText("Login failed, try again.")
 
 class Ui_MainWindow:
     def setupUi(self, MainWindow):
@@ -96,10 +130,10 @@ class Ui_MainWindow:
         self.new_meeting_window.show()
 
     def joinmeeting(self):
-        self.newDialogue = QMainWindow()
-        self.meetingDialogue = joinmeetingdialog()
-        self.meetingDialogue.dialogue(self.newDialogue)
-        self.newDialogue.show()
+        self.newDialog = QMainWindow()
+        self.meetingDialog = joinmeetingdialog()
+        self.meetingDialog.Dialog(self.newDialog)
+        self.newDialog.show()
 
 class meeting():
     def setupMeeting(self, MainWindow):
@@ -111,11 +145,13 @@ class meeting():
         encrypted_id = encrypt_data(meeting_id)
         encrypted_passcode = encrypt_data(passcode)
         port = get_free_port()
-        db.collection("meetings").add({
+        doc_ref = db.collection("meetings").add({
             "meeting_id": encrypted_id,
             "passcode": encrypted_passcode,
             "port": port
-        })
+        })[1]
+        self.firestore_doc = doc_ref
+        print(f"Created Firestore doc ID: {self.firestore_doc.id}")
 
         self.centralwidget = QWidget(MainWindow)
         MainWindow.setCentralWidget(self.centralwidget)
@@ -155,7 +191,6 @@ class meeting():
         self.button_h_layout.addStretch(1)
         self.main_layout.addLayout(self.button_h_layout)
 
-        # Start server thread and handle shutdown event
         self.shutdown_event = threading.Event()
         self.server_thread = threading.Thread(target=serverside.start_server, args=(port, self.shutdown_event), daemon=True)
         self.server_thread.start()
@@ -176,9 +211,17 @@ class meeting():
         self.shutdown_event.set()
         self.server_thread.join()
         event.accept()
+        if hasattr(self, "firestore_doc"):
+            try:
+                print("on_close() called, attempting to delete meeting")
+                self.firestore_doc.delete()
+                print(f"Deleted Firestore doc ID: {self.firestore_doc.id}")
+                print("Firestore meeting deleted!")
+            except Exception as e:
+                print(f"Failed to delete doc: {e}")
 
 class joinmeetingdialog():
-    def dialogue(self, MainWindow):
+    def Dialog(self, MainWindow):
         self.main_layout = QVBoxLayout()
         self.main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         MainWindow.setWindowTitle("Join Meeting")
