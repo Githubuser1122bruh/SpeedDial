@@ -11,7 +11,7 @@ import threading
 import socketio
 from app import serverside
 from app.fernetkeygen import key
-from RESTauth import sign_in
+from RESTauth import sign_in, get_google_oauth_token, firebase_google_sign_in
 
 base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 style_path = os.path.join(base_dir, "assets", "logo.png")
@@ -51,34 +51,66 @@ class loginDialog(QDialog):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Login")
-        self.resize(300, 150)
+        self.resize(300, 300)
 
         layout = QVBoxLayout()
 
+        self.status_label = QLabel("")
+
         self.email_input = QLineEdit()
-        self.email_input.setPlaceHolderText("samhith.pola@gmail.com (enter email)")
+        self.email_input.setPlaceholderText("samhith.pola@gmail.com (enter email)")
         layout.addWidget(self.email_input)
-        
+        self.google_login_btn = QPushButton("Sign in with Google")
+        self.google_login_btn.clicked.connect(self.handle_google_signin)
+        layout.addWidget(self.google_login_btn)
+
         self.password_input = QLineEdit()
-        self.password_input.setPlaceHolderText("Enter Password")
-        self.password_input.setEchoMode(QLineEdit.Password)
+        self.password_input.setPlaceholderText("Enter Password")
+     #   self.password_input.setEchoMode(QLineEdit.Password)
         layout.addWidget(self.password_input)
+
+        self.login_button = QPushButton("Login")
+        self.login_button.clicked.connect(self.attempt_login)
+        layout.addWidget(self.login_button)
         
         self.setLayout(layout)
 
         self.token = None
 
-        def attempt_login(self):
-            email = self.email_input.text()
-            password = self.password_input.text()
-
-            credentials = sign_in(email, password)
+    def handle_google_signin(self):
+        try:
+            id_token = get_google_oauth_token()
+            credentials = firebase_google_sign_in(id_token)
             if credentials:
-                self.token = credentials["idToken"]
-                self.status_label.setText("Login successful")
-                self.accept()
+                print("Google Sign-In successful!")
+                self.on_login_success()
             else:
-                self.status_label.setText("Login failed, try again.")
+                print("Google Sign-In failed.")
+        except Exception as e:
+            print(f"Error during Google Sign-In: {e}")
+
+    def on_login_success(self):
+        print("User successfully logged in!")
+
+    def attempt_login(self):
+        email = self.email_input.text().strip()
+        password = self.password_input.text().strip()
+
+        credentials = sign_in(email, password)
+        if not credentials:
+            print("Login failed, attempting to register...")
+            from RESTauth import sign_up
+            sign_up_result = sign_up(email, password)
+            if sign_up_result:
+                print("Registration successful, trying login again...")
+                credentials = sign_in(email, password)
+
+        if credentials:
+            self.token = credentials["idToken"]
+            self.status_label.setText("Login successful")
+            self.accept()
+        else:
+            self.status_label.setText("Login/Registration failed, try again.")
 
 class Ui_MainWindow:
     def setupUi(self, MainWindow):
@@ -151,7 +183,6 @@ class meeting():
             "port": port
         })[1]
         self.firestore_doc = doc_ref
-        print(f"Created Firestore doc ID: {self.firestore_doc.id}")
 
         self.centralwidget = QWidget(MainWindow)
         MainWindow.setCentralWidget(self.centralwidget)
@@ -213,9 +244,7 @@ class meeting():
         event.accept()
         if hasattr(self, "firestore_doc"):
             try:
-                print("on_close() called, attempting to delete meeting")
                 self.firestore_doc.delete()
-                print(f"Deleted Firestore doc ID: {self.firestore_doc.id}")
                 print("Firestore meeting deleted!")
             except Exception as e:
                 print(f"Failed to delete doc: {e}")
