@@ -6,8 +6,9 @@ from app.ui_main import Ui_MainWindow
 from app.ui_main import loginDialog
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, user_info=None):
         super().__init__()
+        self.user_info = user_info
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
 
@@ -20,7 +21,9 @@ class MainWindow(QMainWindow):
     def show_login(self):
         login = loginDialog()
         if login.exec() == QDialog.Accepted:
-            self.user_token = login.token
-            print("Authenticated user token:", self.user_token)
+            self.user_info = login.user_info
+            print("Authenticated user token:", self.user_info.get("id_token"))
+            self.__init__(user_info=self.user_info)  # reinitialize with user info
+            self.show()
         else:
             print("Login cancelled or failed")

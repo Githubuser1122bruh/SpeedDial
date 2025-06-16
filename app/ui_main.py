@@ -52,30 +52,32 @@ class loginDialog(QDialog):
         super().__init__()
         self.setWindowTitle("Login")
         self.resize(300, 300)
+        self.user_info = None
+        self.token = None
 
         layout = QVBoxLayout()
 
         self.status_label = QLabel("")
+        layout.addWidget(self.status_label)
 
         self.email_input = QLineEdit()
-        self.email_input.setPlaceholderText("samhith.pola@gmail.com (enter email)")
+        self.email_input.setPlaceholderText("Email")
         layout.addWidget(self.email_input)
+
         self.google_login_btn = QPushButton("Sign in with Google")
         self.google_login_btn.clicked.connect(self.handle_google_signin)
         layout.addWidget(self.google_login_btn)
 
         self.password_input = QLineEdit()
-        self.password_input.setPlaceholderText("Enter Password")
-     #   self.password_input.setEchoMode(QLineEdit.Password)
+        self.password_input.setPlaceholderText("Password")
+        self.password_input.setEchoMode(QLineEdit.Password)
         layout.addWidget(self.password_input)
 
         self.login_button = QPushButton("Login")
         self.login_button.clicked.connect(self.attempt_login)
         layout.addWidget(self.login_button)
-        
-        self.setLayout(layout)
 
-        self.token = None
+        self.setLayout(layout)
 
     def handle_google_signin(self):
         try:
@@ -83,14 +85,20 @@ class loginDialog(QDialog):
             credentials = firebase_google_sign_in(id_token)
             if credentials:
                 print("Google Sign-In successful!")
+                self.user_info = {
+                    "uid": credentials.get("localId"),
+                    "id_token": credentials.get("idToken"),
+                    "email": credentials.get("email")
+                }
+                self.token = credentials["idToken"]
                 self.on_login_success()
+                self.accept()
             else:
                 print("Google Sign-In failed.")
+                self.status_label.setText("Google Sign-In failed.")
         except Exception as e:
             print(f"Error during Google Sign-In: {e}")
-
-    def on_login_success(self):
-        print("User successfully logged in!")
+            self.status_label.setText("Error during Google Sign-In")
 
     def attempt_login(self):
         email = self.email_input.text().strip()
@@ -99,19 +107,31 @@ class loginDialog(QDialog):
         credentials = sign_in(email, password)
         if not credentials:
             print("Login failed, attempting to register...")
-            from RESTauth import sign_up
             sign_up_result = sign_up(email, password)
             if sign_up_result:
                 print("Registration successful, trying login again...")
                 credentials = sign_in(email, password)
 
         if credentials:
+            self.user_info = {
+                "uid": credentials.get("localId"),
+                "id_token": credentials.get("idToken"),
+                "email": credentials.get("email")
+            }
             self.token = credentials["idToken"]
             self.status_label.setText("Login successful")
+            self.on_login_success()
             self.accept()
         else:
             self.status_label.setText("Login/Registration failed, try again.")
 
+    def on_login_success(self):
+        print("User successfully logged in!")
+        print(f"UID: {self.user_info.get('uid')}")
+        print(f"Email: {self.user_info.get('email')}")
+        print(f"Token: {self.user_info.get('id_token')[:20]}...")
+        self.status_label.setText("Login success!\nWelcome: " + self.user_info.get("email"))
+        
 class Ui_MainWindow:
     def setupUi(self, MainWindow):
         screen = QGuiApplication.primaryScreen().geometry()

@@ -4,7 +4,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 
 API_KEY = "AIzaSyC_0wIiqOtmnznlm75oDUzdrIqMvgPfGJE"
 
-from auth_thread import GoogleOAuthThread  # or from .auth_thread if inside module
+from auth_thread import GoogleOAuthThread 
 
 def start_google_sign_in(self):
     self.oauth_thread = GoogleOAuthThread()
@@ -74,7 +74,8 @@ def firebase_google_sign_in(id_token):
 def get_google_oauth_token():
     flow = InstalledAppFlow.from_client_secrets_file(
         "client_secret.json",
-        scopes=["openid", "email"]
+        scopes=["openid", "https://www.googleapis.com/auth/userinfo.email"]
     )
-    creds = flow.run_local_server(port=8080)
+    creds = flow.run_local_server(port=8081)
     return creds.id_token
+
