@@ -11,12 +11,13 @@ import threading
 import socketio
 from app import serverside
 from app.fernetkeygen import key
-from RESTauth import sign_in, get_google_oauth_token, firebase_google_sign_in
+from RESTauth import sign_in, get_google_oauth_token, firebase_google_sign_in, sign_up
+from config import CONFIG, CONFIG_PATH
 
 base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 style_path = os.path.join(base_dir, "assets", "logo.png")
 
-cred = credentials.Certificate(os.path.join(base_dir, "app/speeddial-f2572-firebase-adminsdk-fbsvc-19fdde59c7.json"))
+cred = credentials.Certificate(CONFIG_PATH)
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
@@ -131,7 +132,7 @@ class loginDialog(QDialog):
         print(f"Email: {self.user_info.get('email')}")
         print(f"Token: {self.user_info.get('id_token')[:20]}...")
         self.status_label.setText("Login success!\nWelcome: " + self.user_info.get("email"))
-        
+
 class Ui_MainWindow:
     def setupUi(self, MainWindow):
         screen = QGuiApplication.primaryScreen().geometry()
