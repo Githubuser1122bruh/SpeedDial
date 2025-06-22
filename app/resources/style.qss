@@ -1,44 +1,60 @@
+/* Main Window */
 QMainWindow {
     background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                    stop: 0 rgb(60, 21, 52),
-                                    stop: 1 rgb(13, 13, 13));
-    border-radius: 9999px;
+                                      stop: 0 rgb(50, 25, 75),
+                                      stop: 1 rgb(20, 20, 20));
 }
 
-QPushButton {
-    background-color: rgba(44, 55, 149, 0.36);
-    color: rgb(29, 43, 55);
-    padding: 0px;
-    min-width: 100px; 
-    max-width: 500px;
-    min-height: 200px; 
-    border-radius: 10px;
-    font-size: 64px;
-    font-weight: bold;
-    font-family: "Helvetica", sans-serif;
+/* General Labels */
+QLabel {
+    padding: 12px;
+    color: white;
+    font-family: "Segoe UI", sans-serif;
+    font-size: 16px;
 }
 
-QPushButton:hover {
-    background-color: #005a9e;
-}
-
+/* Logo */
 .logoLabel {
-    background-color: rgba(255, 255, 255, 0.5);
-    border: 2px solid #0078d7;
-    border-radius: 65px;
+    background-color: rgba(255, 255, 255, 0.15);
+    border: 2px solid #3498db;
+    border-radius: 75px;
     padding: 10px;
     max-width: 150px;
-    max-height: 150px;   
+    max-height: 150px;
 }
 
+/* Confirm Button */
 .confirmbutton {
     max-width: 400px;
     max-height: 100px;
-    padding: 10px;
-    border-radius: 15px;
-    background-color: rgb(117, 109, 109);
+    padding: 16px;
+    border-radius: 20px;
+    background-color: #2c3e50;
+    color: white;
+    font-size: 20px;
+    font-weight: 600;
+    font-family: "Segoe UI", sans-serif;
+    transition: background-color 0.3s ease;
+}
+.confirmbutton:hover {
+    background-color: #34495e;
 }
 
-QLabel {
-    padding: 15px;
+/* Main Buttons */
+QPushButton {
+    background-color: rgba(44, 62, 80, 0.75);
+    color: white;
+    padding: 12px 20px;
+    min-width: 100px;
+    max-width: 300px;
+    min-height: 80px;
+    border-radius: 12px;
+    font-size: 20px;
+    font-weight: bold;
+    font-family: "Segoe UI", sans-serif;
+    transition: background-color 0.3s ease;
+}
+
+QPushButton:hover {
+    background-color: #1abc9c;
 }

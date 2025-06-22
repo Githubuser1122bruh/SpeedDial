@@ -1,9 +1,14 @@
-import firebase_admin
-from firebase_admin import credentials, firestore
 import os
+from firebase_admin import credentials, initialize_app, firestore
+from dotenv import load_dotenv
 
-cred_path = os.path.join(os.path.drname(__file__), '..', 'firebase-key.json')
+load_dotenv()
+
+cred_path = os.getenv("FIREBASE_CREDENTIAL_PATH")
+if not cred_path:
+    raise ValueError("FIREBASE_CREDENTIAL_PATH not set in environment variables")
+
 cred = credentials.Certificate(cred_path)
-firebase_admin.initialize_app(cred)
+initialize_app(cred)
 
 db = firestore.client()

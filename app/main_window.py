@@ -23,7 +23,11 @@ class MainWindow(QMainWindow):
         if login.exec() == QDialog.Accepted:
             self.user_info = login.user_info
             print("Authenticated user token:", self.user_info.get("id_token"))
-            self.__init__(user_info=self.user_info)  # reinitialize with user info
+            self.load_user_info()
             self.show()
         else:
             print("Login cancelled or failed")
+
+    def load_user_info(self):
+        # Add logic to update UI with new user_info if needed
+        print("User info loaded:", self.user_info)

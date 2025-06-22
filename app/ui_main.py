@@ -13,6 +13,8 @@ from app import serverside
 from app.fernetkeygen import key
 from RESTauth import sign_in, get_google_oauth_token, firebase_google_sign_in, sign_up
 from config import CONFIG, CONFIG_PATH
+from app.video_audio_manager import VideoWidget
+from app.video_audio_manager import RecordAudio
 
 base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 style_path = os.path.join(base_dir, "assets", "logo.png")
@@ -133,7 +135,7 @@ class loginDialog(QDialog):
         print(f"Token: {self.user_info.get('id_token')[:20]}...")
         self.status_label.setText("Login success!\nWelcome: " + self.user_info.get("email"))
 
-class Ui_MainWindow:
+class Ui_MainWindow(QMainWindow):
     def setupUi(self, MainWindow):
         screen = QGuiApplication.primaryScreen().geometry()
         MainWindow.move((screen.width() - MainWindow.width()) // 2, (screen.height() - MainWindow.height()) // 2)
@@ -156,6 +158,7 @@ class Ui_MainWindow:
         self.version1namelabel = QLabel("V1 SpeedDial")
         self.version1namelabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.logo_layout.addWidget(self.version1namelabel)
+
 
         self.top_bar_layout.addStretch()
         self.top_bar_layout.addLayout(self.logo_layout)
@@ -208,11 +211,18 @@ class meeting():
         self.centralwidget = QWidget(MainWindow)
         MainWindow.setCentralWidget(self.centralwidget)
         self.main_layout = QVBoxLayout(self.centralwidget)
+        self.audio_recorder = RecordAudio()
+        self.toggle_state = False
+
 
         self.top_bar_widget = QWidget()
         self.top_bar_widget.setFixedHeight(60)
         self.top_bar_widget.setStyleSheet("background-color: #2c3e50;")
         self.top_bar_layout = QHBoxLayout(self.top_bar_widget)
+        self.muteunmutebutton = QPushButton()
+        self.top_bar_layout.addWidget(self.muteunmutebutton)
+        self.muteunmutebutton.clicked.connect(self.unmutemute)
+        self.video = VideoWidget()
 
         self.logo_label = QLabel()
         self.logo_label.setFixedSize(30, 30)
@@ -242,6 +252,8 @@ class meeting():
         self.button_h_layout.addWidget(self.close_button, alignment=Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft)
         self.button_h_layout.addStretch(1)
         self.main_layout.addLayout(self.button_h_layout)
+        self.video.setFixedSize(640, 480)
+        self.main_layout.addWidget(self.video)
 
         self.shutdown_event = threading.Event()
         self.server_thread = threading.Thread(target=serverside.start_server, args=(port, self.shutdown_event), daemon=True)
@@ -269,6 +281,16 @@ class meeting():
                 print("Firestore meeting deleted!")
             except Exception as e:
                 print(f"Failed to delete doc: {e}")
+
+    def unmutemute(self):
+        self.toggle_state = not self.toggle_state
+        if self.toggle_state:
+            print("Unmuted")
+            self.audio_recorder.start_recording()
+        else:
+            print("Mute button pressed")
+            self.audio_recorder.stop_recording()
+
 
 class joinmeetingdialog():
     def Dialog(self, MainWindow):
