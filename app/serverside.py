@@ -54,18 +54,25 @@ def on_disconnect():
             break
 
 def start_server(port, shutdown_event):
-    print(f"Launching SocketIO server on port {port}")
+    print(f"[server] Preparing to launch SocketIO server on port {port}")
 
     def run_socketio():
-        socketio.run(app, host='0.0.0.0', port=port)
+        try:
+            print(f"[server] Starting server on 0.0.0.0:{port}...")
+            socketio.run(app, host='0.0.0.0', port=port, debug=True)
+            print(f"[server] Flask-SocketIO server running on port {port}")
+        except OSError as e:
+            print(f"[server] Port error: {e}")
+        except Exception as e:
+            print(f"[server] Unexpected error: {e}")
 
-    server_thread = threading.Thread(target=run_socketio)
+    server_thread = threading.Thread(target=run_socketio, daemon=True)
     server_thread.start()
 
     while not shutdown_event.is_set():
-        time.sleep(0.5) 
+        time.sleep(0.5)
 
-    print("Server shutdown signal received")
+    print(f"[server] Shutdown signal received for port {port}")
 
 def end_server(port):
     print(f"Stopping SocketIO server on port {port}")

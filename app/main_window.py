@@ -1,5 +1,3 @@
-# This file contains all the code for running the main window
-
 from PySide6.QtWidgets import QMainWindow, QGraphicsDropShadowEffect, QDialog
 from PySide6.QtGui import QColor
 from app.ui_main import Ui_MainWindow
@@ -29,5 +27,4 @@ class MainWindow(QMainWindow):
             print("Login cancelled or failed")
 
     def load_user_info(self):
-        # Add logic to update UI with new user_info if needed
         print("User info loaded:", self.user_info)

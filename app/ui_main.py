@@ -5,7 +5,6 @@ from PySide6.QtWidgets import QMainWindow, QPushButton, QDialog, QVBoxLayout, QH
 from PySide6.QtGui import QGuiApplication, QImage, QPixmap
 from PySide6.QtCore import Qt 
 import random
-import sqlite3
 import socket
 import threading
 import socketio
@@ -35,7 +34,7 @@ def get_local_ip():
         print("IP couldnt be found, reverting to fallback IP")
         return "127.0.0.1"
 
-host_ip = get_local_ip() # changed to the users local ip
+host_ip = get_local_ip()
 
 def get_free_port():
     s = socket.socket()
@@ -88,12 +87,7 @@ class loginDialog(QDialog):
             credentials = firebase_google_sign_in(id_token)
             if credentials:
                 print("Google Sign-In successful!")
-                self.user_info = {
-                    "uid": credentials.get("localId"),
-                    "id_token": credentials.get("idToken"),
-                    "email": credentials.get("email")
-                }
-                self.token = credentials["idToken"]
+                self._set_user_credentials(credentials)
                 self.on_login_success()
                 self.accept()
             else:
@@ -116,17 +110,20 @@ class loginDialog(QDialog):
                 credentials = sign_in(email, password)
 
         if credentials:
-            self.user_info = {
-                "uid": credentials.get("localId"),
-                "id_token": credentials.get("idToken"),
-                "email": credentials.get("email")
-            }
-            self.token = credentials["idToken"]
+            self._set_user_credentials(credentials)
             self.status_label.setText("Login successful")
             self.on_login_success()
             self.accept()
         else:
             self.status_label.setText("Login/Registration failed, try again.")
+
+    def _set_user_credentials(self, credentials):
+        self.user_info = {
+            "uid": credentials.get("localId"),
+            "id_token": credentials.get("idToken"),
+            "email": credentials.get("email")
+        }
+        self.token = credentials["idToken"]
 
     def on_login_success(self):
         print("User successfully logged in!")
@@ -138,8 +135,8 @@ class loginDialog(QDialog):
 class Ui_MainWindow(QMainWindow):
     def setupUi(self, MainWindow):
         screen = QGuiApplication.primaryScreen().geometry()
-        MainWindow.move((screen.width() - MainWindow.width()) // 2, (screen.height() - MainWindow.height()) // 2)
         MainWindow.resize(screen.width() - 50, screen.height() - 100)
+        MainWindow.move((screen.width() - MainWindow.width()) // 2, (screen.height() - MainWindow.height()) // 2)
         MainWindow.setWindowTitle("SpeedDial V1")
 
         self.centralwidget = QWidget(MainWindow)
@@ -159,7 +156,6 @@ class Ui_MainWindow(QMainWindow):
         self.version1namelabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.logo_layout.addWidget(self.version1namelabel)
 
-
         self.top_bar_layout.addStretch()
         self.top_bar_layout.addLayout(self.logo_layout)
         self.main_layout.addLayout(self.top_bar_layout)
@@ -170,12 +166,23 @@ class Ui_MainWindow(QMainWindow):
         else:
             self.logo_label.setText("Failed to load image")
 
+        self.nameLabel = QLabel("SpeedDial V1")
+        self.nameLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.nameLabel.setStyleSheet("background-color: rgba(255, 255, 255, 0.15); border: 2px solid #3498db; border-radius: 75px; padding: 10px; max-width: 600px; max-height: 150px; font-size: 100px")
+
         self.button = QPushButton("New Meeting")
         self.joinbutton = QPushButton("Join Meeting")
-        self.main_layout.addWidget(self.button)
-        self.main_layout.addWidget(self.joinbutton)
-        self.main_layout.setAlignment(self.button, Qt.AlignmentFlag.AlignCenter)
-        self.main_layout.setAlignment(self.joinbutton, Qt.AlignmentFlag.AlignCenter)
+
+        self.main_layout.addStretch(2)
+        self.main_layout.addWidget(self.nameLabel, alignment=Qt.AlignmentFlag.AlignHCenter)
+        self.main_layout.addStretch(2)
+        
+        self.button_layout = QHBoxLayout()
+        self.button_layout.addWidget(self.button)
+        self.button_layout.addWidget(self.joinbutton)
+        self.main_layout.addLayout(self.button_layout)
+        self.main_layout.addStretch(1)
+
         self.button.clicked.connect(self.makenewmeeting)
         self.joinbutton.clicked.connect(self.joinmeeting)
 
@@ -201,6 +208,7 @@ class meeting():
         encrypted_id = encrypt_data(meeting_id)
         encrypted_passcode = encrypt_data(passcode)
         port = get_free_port()
+        
         doc_ref = db.collection("meetings").add({
             "meeting_id": encrypted_id,
             "passcode": encrypted_passcode,
@@ -214,22 +222,24 @@ class meeting():
         self.audio_recorder = RecordAudio()
         self.toggle_state = False
 
-
         self.top_bar_widget = QWidget()
         self.top_bar_widget.setFixedHeight(60)
         self.top_bar_widget.setStyleSheet("background-color: #2c3e50;")
         self.top_bar_layout = QHBoxLayout(self.top_bar_widget)
-        self.muteunmutebutton = QPushButton()
+
+        self.muteunmutebutton = QPushButton("Mute")
         self.top_bar_layout.addWidget(self.muteunmutebutton)
         self.muteunmutebutton.clicked.connect(self.unmutemute)
+
         self.video = VideoWidget()
+        self.video.setFixedSize(640, 480)
 
         self.logo_label = QLabel()
         self.logo_label.setFixedSize(30, 30)
         self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         image = QImage(style_path)
         if not image.isNull():
-            self.logo_label.setPixmap(QPixmap.fromImage(image).scaled(50, 50, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            self.logo_label.setPixmap(QPixmap.fromImage(image).scaled(30, 30, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         else:
             self.logo_label.setText("Logo")
         self.top_bar_layout.addWidget(self.logo_label)
@@ -242,18 +252,25 @@ class meeting():
         self.passcodelabel.setStyleSheet("color: white; font-size: 16px;")
         self.top_bar_layout.addWidget(self.passcodelabel)
 
+        self.top_bar_layout.addStretch()
+
         self.main_layout.addWidget(self.top_bar_widget)
+        self.main_layout.addStretch(1)
+
+        self.main_layout.addWidget(self.video, alignment=Qt.AlignmentFlag.AlignCenter)
         self.main_layout.addStretch(1)
 
         self.button_h_layout = QHBoxLayout()
         self.close_button = QPushButton("Close Meeting")
-        self.close_button.setFixedSize(80, 20)
+        self.close_button.setFixedSize(120, 30)
         self.close_button.clicked.connect(MainWindow.close)
-        self.button_h_layout.addWidget(self.close_button, alignment=Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft)
+        
         self.button_h_layout.addStretch(1)
+        self.button_h_layout.addWidget(self.close_button)
+        self.button_h_layout.setSpacing(10)
         self.main_layout.addLayout(self.button_h_layout)
-        self.video.setFixedSize(640, 480)
-        self.main_layout.addWidget(self.video)
+        
+        self.main_layout.addStretch(1)
 
         self.shutdown_event = threading.Event()
         self.server_thread = threading.Thread(target=serverside.start_server, args=(port, self.shutdown_event), daemon=True)
@@ -272,23 +289,29 @@ class meeting():
                 return meeting_id, passcode
 
     def on_close(self, event):
+        print("Meeting window closing. Shutting down server and deleting Firestore doc.")
         self.shutdown_event.set()
-        self.server_thread.join()
-        event.accept()
+        self.server_thread.join(timeout=5)
+        if self.server_thread.is_alive():
+            print("Server thread did not terminate in time.")
+        
         if hasattr(self, "firestore_doc"):
             try:
                 self.firestore_doc.delete()
-                print("Firestore meeting deleted!")
+                print("Firestore meeting deleted successfully!")
             except Exception as e:
-                print(f"Failed to delete doc: {e}")
+                print(f"Failed to delete Firestore doc: {e}")
+        event.accept()
 
     def unmutemute(self):
         self.toggle_state = not self.toggle_state
         if self.toggle_state:
             print("Unmuted")
+            self.muteunmutebutton.setText("Mute")
             self.audio_recorder.start_recording()
         else:
             print("Mute button pressed")
+            self.muteunmutebutton.setText("Unmute")
             self.audio_recorder.stop_recording()
 
 
@@ -328,63 +351,63 @@ class joinmeetingdialog():
         self.confirmbutton.clicked.connect(self.onclickconfirm)
         self.confirmbutton.setProperty("class", "confirmbutton")
 
-    def onclickconfirm(self, status=None):
-        docs = db.collection("meetings").stream()
-        rows = [(doc.to_dict()["meeting_id"], doc.to_dict()["passcode"]) for doc in docs]
+    def onclickconfirm(self):
         self.requestedid = self.inputidbox.text().strip()
         self.requestedpasscode = self.inputpasswordbox.text().strip()
-        print(f"ID: {self.requestedid} Passcode: {self.requestedpasscode}")
-        for encrypted_id, encrypted_pass in rows:
+        print(f"Attempting to join - ID: {self.requestedid} Passcode: {self.requestedpasscode}")
+
+        found_meeting_port = None
+        for doc in db.collection("meetings").stream():
             try:
-                decrypted_id = decrypt_data(encrypted_id).strip()
-                decrypted_pass = decrypt_data(encrypted_pass).strip()
+                doc_data = doc.to_dict()
+                decrypted_id = decrypt_data(doc_data["meeting_id"]).strip()
+                decrypted_pass = decrypt_data(doc_data["passcode"]).strip()
+
                 if self.requestedid == decrypted_id and self.requestedpasscode == decrypted_pass:
-                    print("Match found! Connecting to meeting...")
-                    self.connect_meeting(confirmornot=True)
-                    return
+                    found_meeting_port = doc_data["port"]
+                    break
             except Exception as e:
-                print(f"Decryption error: {e}")
+                print(f"Decryption error or missing field in doc {doc.id}: {e}")
+                continue 
+        
+        if found_meeting_port is not None:
+            print(f"Match found! Meeting port: {found_meeting_port}. Attempting to connect...")
+            self._connect_to_meeting(found_meeting_port)
+        else:
+            self.confirmedornotlabel.setText("Invalid meeting ID or passcode")
+            print("No matching meeting found or invalid credentials.")
 
-        self.confirmedornotlabel.setText("Invalid meeting ID or passcode")
+    def _connect_to_meeting(self, port):
+        try:
+            self.sio = socketio.Client(logger=True, engineio_logger=True)
 
-    def connect_meeting(self, confirmornot):
-        if confirmornot:
-            encrypted_id = encrypt_data(self.requestedid)
-            docs = db.collection("meetings").where("meeting_id", "==", encrypted_id).stream()
-            row = next(docs, None)
-            if row:
-                data = row.to_dict()
-                stored_passcode_encrypted = data["passcode"]
-                port = data["port"]
-                stored_passcode = decrypt_data(stored_passcode_encrypted).strip()
+            @self.sio.event
+            def connect():
+                print("[Client] Connected to server")
+                self.confirmedornotlabel.setText(f"Connected to meeting: {self.requestedid}")
 
-                if stored_passcode == self.requestedpasscode:
-                    self.sio = socketio.Client(logger=True, engineio_logger=True)
+            @self.sio.event
+            def connect_error(data):
+                print(f"[Client] Connection failed: {data}")
+                self.confirmedornotlabel.setText(f"Connection failed: {data}")
 
-                    @self.sio.event
-                    def connect():
-                        print("[Client] Connected to server")
+            @self.sio.event
+            def disconnect():
+                print("[Client] Disconnected from server")
+                self.confirmedornotlabel.setText("Disconnected from meeting")
 
-                    @self.sio.event
-                    def connect_error(data):
-                        print(f"[Client] Connection failed: {data}")
-
-                    @self.sio.event
-                    def disconnect():
-                        print("[Client] Disconnected from server")
-
-                    try:
-                        print(f"[Client] Trying to connect to http://{host_ip}:{port}")
-                        self.sio.connect(f"http://{host_ip}:{port}")
-                        print("[Client] Connected, emitting join event")
-                        self.sio.emit("join", {
-                            "room": self.requestedid,
-                            "peer_id": "client_" + self.requestedid
-                        })
-                    except Exception as e:
-                        print(f"[Client] Exception during connection or emit: {e}")
-                        self.confirmedornotlabel.setText("Failed to connect")
-                else:
-                    self.confirmedornotlabel.setText("Incorrect passcode")
+            print(f"[Client] Trying to connect to http://{host_ip}:{port}")
+            self.sio.connect(f"http://{host_ip}:{port}", transports=['websocket'])
+            
+            if self.sio.connected:
+                print("[Client] Connected, emitting join event")
+                self.sio.emit("join", {
+                    "room": self.requestedid,
+                    "peer_id": "client_" + self.requestedid
+                })
             else:
-                self.confirmedornotlabel.setText("Meeting not found")
+                self.confirmedornotlabel.setText("Failed to establish socket connection.")
+
+        except Exception as e:
+            print(f"[Client] Exception during connection or emit: {e}")
+            self.confirmedornotlabel.setText("Failed to connect to meeting")
